@@ -23,7 +23,7 @@
     },
     "autoload": {
         "psr-0": {
-            "YcheukfDebug": "src/"
+            "YcheukfMigration": "src/"
         },
         "classmap": [
             "./Module.php"
