@@ -43,21 +43,26 @@ class Migration
         $this->migrationsNamespace = $config['namespace'];
         $this->migrationVersionTable = $migrationVersionTable;
         $this->outputWriter = is_null($writer) ? new OutputWriter() : $writer;
-
-        if (is_null($this->migrationsDir))
-            throw new MigrationException('Migrations directory not set!');
-
+		self::generateMigrationDir($this->migrationsDir);
         if (is_null($this->migrationsNamespace))
             throw new MigrationException('Unknown namespaces!');
 
-        if (!is_dir($this->migrationsDir)) {
-            if (!mkdir($this->migrationsDir, 0775, true)) {
-                throw new MigrationException(sprintf('Failed to create migrations directory %s', $this->migrationsDir));
-            }
-        }
 
         $this->checkCreateMigrationTable();
     }
+
+	public static function generateMigrationDir($migrationsDir){
+        if (is_null($migrationsDir))
+            throw new MigrationException('Migrations directory not set!');
+
+        if (!is_dir($migrationsDir)) {
+            if (!mkdir($migrationsDir, 0775, true)) {
+                throw new MigrationException(sprintf('Failed to create migrations directory %s', $migrationsDir));
+            }
+        }elseif (!is_writable($migrationsDir)) {
+            throw new MigrationException(sprintf('Migrations directory is not writable %s', $migrationsDir));
+        }
+	}
 
     /**
      * Create migrations table of not exists

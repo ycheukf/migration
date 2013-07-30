@@ -56,7 +56,7 @@ class MigrateController extends AbstractActionController
      */
     public function getMigrationConfig()
     {
-		$sMigrationdir = $this->getRequest()->getParam('migrationdir', null);
+		$sMigrationdir = $this->getRequest()->getParam('dir', null);
 		$config = $this->getServiceLocator()->get('configuration');
 		$config['migrations']['dir'] = !is_null($sMigrationdir) ? str_replace("/default", "/".$sMigrationdir, $config['migrations']['dir']) : $config['migrations']['dir'];
 		return $config;
@@ -133,7 +133,6 @@ class MigrateController extends AbstractActionController
                     $console->write($message . "\n");
                 });
             }
-//var_export($config['migrations']);
 
             /** @var $migrationVersionTable \YcheukfMigration\Model\MigrationVersionTable */
             $migrationVersionTable = $this->getServiceLocator()->get('YcheukfMigration\Model\MigrationVersionTable');
@@ -156,12 +155,18 @@ class MigrateController extends AbstractActionController
 				if(in_array($v, array('up', 'down')))$aConsoleReq[] = $sDbKey;
 			}
 		}
-		$sCommand = "php ".$this->getRequest()->getScriptName()." ".join(" ", $aConsoleReq);
-
-		\Dmdebug\Model\Dmdebug::_($sCommand, 'a', 'migration db key');
+//		$sCommand = "php ".BASE_INDEX_PATH."/".$this->getRequest()->getScriptName()." ".join(" ", $aConsoleReq);
+		$sCommand = "php ".BASE_INDEX_PATH."/index.php ".join(" ", $aConsoleReq);
+//echo BASE_INDEX_PATH."\n";
+//echo $sCommand."\n";
+		\YcheukfDebug\Model\Debug::dump($sCommand, 'a', 'migration db key');
 		return ($sCommand);
 	}
 
+    public function checkParam(){
+//		if($this->getRequest()->getParam('dbkey', null) == null)
+//			throw new MigrationException('missin param <dbkey>');
+	}
 
     /**
      * up migrations - applied all update
@@ -171,27 +176,36 @@ class MigrateController extends AbstractActionController
      */
     public function upAction()
     {
-		$this->_getDbsFromEvent();
-		if(count($this->aDbsConfig) == 1){//single migration
-			foreach($this->aDbsConfig as $sKey => $aConfigTmp){
-				$this->_echomemo($aConfigTmp);
-				$this->_setDbAdapter($aConfigTmp);
-				while($sMsg = $this->applyAction()){
-					if(self::MSG_MIGRATIONS_APPLIED != $sMsg){
-						echo $sMsg;
-						break;
+      try {
+			$this->checkParam();
+			$this->setDbConfigsFromEvent();
+			if(count($this->aDbsConfig) == 1){//single migration
+				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
+					$this->_echomemo($aConfigTmp);
+					$this->_setDbAdapter($aConfigTmp);
+					while($sMsg = $this->applyAction()){
+						if(self::MSG_MIGRATIONS_APPLIED != $sMsg){
+							echo $sMsg;
+							break;
+						}
 					}
 				}
+				return "\nDONE\n\n";
+			}else{//mult migration
+				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
+					$sTmp = $this->_getMigrationCommandByDbKey($sKey);
+					$this->_echomemo($sTmp);
+					system($sTmp);
+				}
 			}
-			return "\nDONE\n\n";
-		}else{//mult migration
-			foreach($this->aDbsConfig as $sKey => $aConfigTmp){
-				$sTmp = $this->_getMigrationCommandByDbKey($sKey);
-				$this->_echomemo($sTmp);
-				system($sTmp);
-			}
-		}
+        } catch (MigrationException $e) {
+            return $this->_echofaild($e->getMessage());
+        }
     }
+    private function _echofaild($sMsg){
+		\YcheukfDebug\Model\Debug::dump($sMsg, 'migration faild');
+		return "====errors:====\n" . $sMsg . "\n\nFAILD!\n\n";
+	}
     private function _echomemo($aConfigTmp){
 		\YcheukfDebug\Model\Debug::dump(json_encode($aConfigTmp), 'migration memo');
 	}
@@ -204,58 +218,66 @@ class MigrateController extends AbstractActionController
      */
     public function downAction()
     {
-		$this->_getDbsFromEvent();
+		try{
+			$this->checkParam();
+			$this->setDbConfigsFromEvent();
 
-		if(count($this->aDbsConfig) == 1){//single migration
-			foreach($this->aDbsConfig as $sKey => $aConfigTmp){
-				$this->_echomemo($aConfigTmp);
-				$this->_setDbAdapter($aConfigTmp);
-				$migrations = $this->getMigration()->getMigrationClasses();
+			if(count($this->aDbsConfig) == 1){//single migration
+				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
+					$this->_echomemo($aConfigTmp);
+					$this->_setDbAdapter($aConfigTmp);
+					$migrations = $this->getMigration()->getMigrationClasses();
 
-				$oParameters = $this->getRequest()->getParams();
-				$oParameters->set('force', true);
-				$oParameters->set('down', true);
-				while(1){
-					$oParameters->set('version', $this->getMigration()->getCurrentVersion($migrations));
-					$this->getRequest()->setParams($oParameters);
-					$sMsg = $this->applyAction();
+					$oParameters = $this->getRequest()->getParams();
+					$oParameters->set('force', true);
+					$oParameters->set('down', true);
+					while(1){
+						$sVersion = $this->getMigration()->getCurrentVersion($migrations);
+						if(empty($sVersion))break;
+						$oParameters->set('version', $sVersion);
+						$this->getRequest()->setParams($oParameters);
+						$sMsg = $this->applyAction();
 
-					if(self::MSG_MIGRATIONS_APPLIED != $sMsg){
-						echo $sMsg;
-						break;
+						if(self::MSG_MIGRATIONS_APPLIED != $sMsg){
+							echo $sMsg;
+							break;
+						}
 					}
 				}
+				return "\nDONE\n\n";
+			}else{//mult migration
+				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
+					$sTmp = $this->_getMigrationCommandByDbKey($sKey);
+					$this->_echomemo($sTmp);
+					system($sTmp);
+				}
 			}
-			return "\nDONE\n\n";
-		}else{//mult migration
-			foreach($this->aDbsConfig as $sKey => $aConfigTmp){
-				$sTmp = $this->_getMigrationCommandByDbKey($sKey);
-				$this->_echomemo($sTmp);
-				system($sTmp);
-			}
-		}
+        } catch (MigrationException $e) {
+            return $this->_echofaild($e->getMessage());
+        }
 	}
     /**
      * @author feng
      * @return Migration
      */
-    protected function _getDbsFromEvent()
+    protected function setDbConfigsFromEvent()
     {
 		$aReturn = array();
-		$sDirName = $this->getRequest()->getParam('migrationdir', "default");
+		$sDirName = $this->getRequest()->getParam('dir', "default");
 		$bDbsfromevent = $this->getRequest()->getParam('dbsfromevent');
 		if($bDbsfromevent){
-			$aTriggerRes = $this->getEventManager()->triggerUntil(__FUNCTION__."_".$sDirName, $this, array(), function($v) {
+			$aTriggerRes = $this->getEventManager()->triggerUntil(__FUNCTION__, $this, array($this->getRequest()), function($v) {
 					return ($v instanceof Response);
 			});
 			$aReturn = $aTriggerRes->last();
+//			var_dump($aReturn);
 			if(!is_null($aReturn)){
 				$sDb = $sDb = $this->getRequest()->getParam('dbkey');
 				if(!is_null($sDb)){
 					if(isset($aReturn[$sDb]))
 						$aReturn = array($sDb=>$aReturn[$sDb]);
 					else
-						throw new MigrationException('Unknown db config key:'. $sDb." from dbsarray:".json_encode($aReturn));
+						throw new MigrationException('Unknown param <dbkey>:'. $sDb." from dbsarray:".json_encode($aReturn));
 				}
 			}
 			else
@@ -266,7 +288,7 @@ class MigrateController extends AbstractActionController
 			if(isset($aConfig[$sDb]))
 				$aReturn[$sDb] = $aConfig[$sDb];
 			else
-				throw new MigrationException('Unknown db config key:'. $sDb);
+				throw new MigrationException('Unknown param <dbkey>:'. $sDb);
 	
 		}
 		$this->aDbsConfig = $aReturn;
@@ -280,7 +302,6 @@ class MigrateController extends AbstractActionController
     protected function _setDbAdapter($aMigrationsDbConfig)
     {
 		$oParameters = $this->getRequest()->getParams();
-//		var_export($aMigrationsDbConfig);
 		$oParameters->set('aMigrationsDbConfig', $aMigrationsDbConfig);
 		$this->getRequest()->setParams($oParameters);
 		$this->getServiceLocator()->setAllowOverride(true);

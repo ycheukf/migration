@@ -1,7 +1,6 @@
 <?php
 namespace YcheukfMigration;
 
-use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\ResultSet\ResultSet;
 use Zend\Db\TableGateway\TableGateway;
 use Zend\EventManager\EventInterface;
@@ -30,69 +29,39 @@ class Module implements
      */
     public function onBootstrap(EventInterface $e)
     {
-
-//        $e->getApplication()->getServiceManager()->get('translator');
         $eventManager = $e->getApplication()->getEventManager();
         $moduleRouteListener = new ModuleRouteListener();
         $moduleRouteListener->attach($eventManager);
 
 		/**
-		* 注册eventmanger. 用于响应migration 批量迁移命令. 从本事件中读取需要迁移的dbs config
+		* attach an event to setDbConfigsFromEvent. 
+		  add this code to other module if you need to add some dynamic db config.
 		*/
         $events = StaticEventManager::getInstance();
-		$events->attach("YcheukfMigration\Controller\MigrateController", array('_getDbsFromEvent_media','_getDbsFromEvent_default','_getDbsFromEvent_main','_getDbsFromEvent_report'), function($e) {
-			$sTriggerName = $e->getName(); // "Example"
+		$events->attach("YcheukfMigration\Controller\MigrateController", array('setDbConfigsFromEvent'), function($e) {
+//			var_dump($e->getParams());
 			$aReturn = array();
-			$aConfig = $e->getTarget()->getServiceLocator()->get('config');
-			
-			$dbParams = isset($aConfig['master']) ? $aConfig['master'] : $aConfig['db'];
-			 $adapter = new \Zend\Db\Adapter\Adapter($dbParams);
-			 $result = $adapter->query('SELECT * FROM `dbConfig`', array());
-			$resultSet = new ResultSet;
-			$resultSet->initialize($result);
-			$sDatabaseName = "";
-			foreach ($resultSet as $row) {
-				switch($sTriggerName){
-					case "_getDbsFromEvent_report":
-						$aReturn[$row['customerid']] = array(
-							'driver'         => 'Pdo',
-							'dsn'            => 'mysql:dbname='.$row['reportMasterDbName'].';host='.$row['reportMasterHost'],
-							'hostname'		 => $row['reportMasterHost'],
-							'database'		 => $row['reportMasterDbName'],
-							'username'		 => $row['reportMasterUserName'],
-							'password'		 => $row['reportMasterPassword'],
-							'driver_options' => array(
-								'SET NAMES \'UTF8\''
-							)
-						);
-						$sDatabaseName = $row['reportMasterDbName'];
-						if(is_string($sDatabaseName) && !empty($sDatabaseName)){
-							$adapter->query('create database if NOT EXISTS '.$sDatabaseName, array());
-						}
-						break;
-					default:
-						$aReturn[$row['customerid']] = array(
-							'driver'         => 'Pdo',
-							'dsn'            => 'mysql:dbname='.$row['masterDbName'].';host='.$row['masterHost'],
-							'hostname'		 => $row['masterHost'],
-							'database'		 => $row['masterDbName'],
-							'username'		 => $row['masterUserName'],
-							'password'		 => $row['masterPassword'],
-							'driver_options' => array(
-								'SET NAMES \'UTF8\''
-							)
-						);
-						$sDatabaseName = $row['masterDbName'];
-						if(is_string($sDatabaseName) && !empty($sDatabaseName)){
-							$adapter->query('create database if NOT EXISTS '.$sDatabaseName, array());
-						}
-
-						break;
-				}
-			}
-			
+			$aReturn['db'] = array(
+				'driver'         => 'Pdo',
+				'dsn'            => 'mysql:dbname=zf2test2;host=localhost',
+				'username'		 => 'root',
+				'password'		 => 'root',
+				'driver_options' => array(
+					'SET NAMES \'UTF8\''
+				)
+			);
+			$aReturn['db2'] = array(
+				'driver'         => 'Pdo',
+				'dsn'            => 'mysql:dbname=zf2test3;host=localhost',
+				'username'		 => 'root',
+				'password'		 => 'root',
+				'driver_options' => array(
+					'SET NAMES \'UTF8\''
+				)
+			);
 			return ($aReturn);
 		});	
+//		*/
     }
 
 	public function init(){
@@ -109,7 +78,7 @@ class Module implements
         return array(
             'Zend\Loader\StandardAutoloader' => array(
                 'namespaces' => array(
-                    __NAMESPACE__ => __DIR__ . '/src/' . __NAMESPACE__,
+                    __NAMESPACE__ => __DIR__ . '/src/migration',
                 ),
             ),
         );
@@ -118,9 +87,6 @@ class Module implements
     public function getServiceConfig()
     {
         return array(
-            'invokables' => array(
-				'YcheukfMigration\Controller\MigrateController' => 'YcheukfMigration\Controller\MigrateController',
-            ),
             'factories' => array(
                 'YcheukfMigration\Model\MigrationVersionTable' => function (ServiceLocatorInterface $serviceLocator) {
                     /** @var $tableGateway TableGateway */
@@ -142,28 +108,26 @@ class Module implements
     public function getConsoleUsage(Console $console)
     {
         return array(
-            'Simple Migrations',
+            'migration [--all]' ,
+			'  List available migrations',
 
-            'migration version' => 'Get last applied migration version',
+			'migration generate [--dir=]',
+			'  Generate new migration ',
 
-            'migration list [--all]' => 'List available migrations',
-            array('--all', 'Include applied migrations'),
+			'migration up [<dbkey>] [--dir=] [--dbsfromevent]',
+			 '  apply up-grade all migration. ',
 
-            'migration apply [<version>] [--force]' => 'Execute migration',
-            array(
-                '--force',
-                'Force apply migration even if it\'s older than the last migrated. Works only with <version> explicitly set.'
-            ),
-            array('--down', 'Force apply down migration. Works only with --force flag set.'),
+			'migration down [<dbkey>] [--dir=] [--dbsfromevent]',
+			'  apply down-grade all migration',
 
-            'migration generate [--migrationdir=]' => 'Generate new migration skeleton class',
+			'  ',
 
-            'migration up [<dbkey>] [--migrationdir=] [--dbsfromevent]' => 'apply all up grade migration. ',
-
-            'migration down [<dbkey>] [--migrationdir=] [--dbsfromevent]' => 'apply all down grade migration',
+            array('--all', 'show all applied migrations'),
+            array('<dbkey>', 'the key of db-config-array. mostly is "db"'),
+            array('--dir', 'migration dir. default is "default"'),
             array(
                 '--dbsfromevent',
-                'get dbconfigs from eventmanager "_getDbsFromEvent", and run all of them'
+                'set db-config-array by event "setDbConfigsFromEvent"'
             ),
         );
     }

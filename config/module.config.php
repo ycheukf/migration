@@ -2,8 +2,8 @@
 
 return array(
     'migrations' => array(
-        'dir' => dirname(__FILE__) . '/../../../migrations/default',
-        'namespace' => 'YcheukfMigration\Migrations',
+        'dir' => dirname(__FILE__) . '/../../../../migrations/default',
+        'namespace' => 'YcheukfMigration\Migration',
         'show_log' => true
     ),
     'console' => array(
@@ -12,27 +12,17 @@ return array(
                 'migration-version' => array(
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration version [--env=] [--migrationdir=]',
+                        'route' => 'migration version [--env=] [--dir=]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'version'
                         )
                     )
                 ),
-                'migration-list2' => array(//feng 2013/6/13
-                    'type' => 'simple',
-                    'options' => array(
-                        'route' => 'migration [--migrationdir=]',
-                        'defaults' => array(
-                            'controller' => 'YcheukfMigration\Controller\Migrate',
-                            'action' => 'list'
-                        )
-                    )
-                ),
                 'migration-list' => array(
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration list [--env=] [--all] [--migrationdir=]',
+                        'route' => 'migration [--env=] [--all] [--dir=]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'list'
@@ -42,7 +32,7 @@ return array(
                 'migration-apply' => array(
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration apply [<version>] [--env=] [--force] [--down] [--migrationdir=]',
+                        'route' => 'migration apply [<version>] [--env=] [--force] [--down] [--dir=]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'apply'
@@ -52,7 +42,7 @@ return array(
                 'migration-generate' => array(
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration generate [--env=] [--migrationdir=]',
+                        'route' => 'migration generate [--env=] [--dir=]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'generateSkeleton'
@@ -62,7 +52,7 @@ return array(
                 'migration-up' => array(//feng 2013/6/13
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration up [<dbkey>] [--migrationdir=] [--dbsfromevent]',
+                        'route' => 'migration up [<dbkey>] [--offset=] [--dir=] [--dbsfromevent]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'up'
@@ -72,7 +62,7 @@ return array(
                 'migration-down' => array(//feng 2013/6/13
                     'type' => 'simple',
                     'options' => array(
-                        'route' => 'migration down [<dbkey>] [--migrationdir=] [--dbsfromevent]',
+                        'route' => 'migration down [<dbkey>] [--offset=] [--dir=] [--dbsfromevent]',
                         'defaults' => array(
                             'controller' => 'YcheukfMigration\Controller\Migrate',
                             'action' => 'down'

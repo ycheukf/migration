@@ -19,14 +19,7 @@ class MigrationSkeletonGenerator
     {
         $this->migrationsDir = $migrationsDir;
         $this->migrationNamespace = $migrationsNamespace;
-
-        if (!is_dir($this->migrationsDir)) {
-            if (!mkdir($this->migrationsDir, 0775)) {
-                throw new MigrationException(sprintf('Failed to create migrations directory %s', $this->migrationsDir));
-            }
-        } elseif (!is_writable($this->migrationsDir)) {
-            throw new MigrationException(sprintf('Migrations directory is not writable %s', $this->migrationsDir));
-        }
+		\YcheukfMigration\Library\Migration::generateMigrationDir($this->migrationsDir);
     }
 
     /**
