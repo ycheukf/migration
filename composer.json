@@ -5,7 +5,8 @@
     "license": "BSD-3-Clause",
     "keywords": [
         "ycheukf",
-        "db migration",
+        "db",
+        "migration",
         "zf2"
     ],
     "homepage": "https://github.com/ycheukf/migration",
