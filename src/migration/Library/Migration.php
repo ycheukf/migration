@@ -34,8 +34,9 @@ class Migration
      * @param OutputWriter $writer
      * @throws MigrationException
      */
-    public function __construct(Adapter $adapter, array $config, MigrationVersionTable $migrationVersionTable, OutputWriter $writer = null)
+    public function __construct(Adapter $adapter, array $config, MigrationVersionTable $migrationVersionTable, OutputWriter $writer = null, $sm=null)
     {
+        $this->serviceManager = $sm;
         $this->adapter = $adapter;
         $this->metadata = new Metadata($this->adapter);
         $this->connection = $this->adapter->getDriver()->getConnection();
@@ -263,7 +264,7 @@ TABLE;
     protected function applyMigration(array $migration, $down = false)
     {
         /** @var $migrationObject AbstractMigration */
-        $migrationObject = new $migration['class']($this->metadata, $this->outputWriter);
+        $migrationObject = new $migration['class']($this->metadata, $this->outputWriter, $this->serviceManager);
 
         $this->outputWriter->writeLine(sprintf("Execute migration class %s %s", $migration['class'], $down ? 'down' : 'up'));
 

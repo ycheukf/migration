@@ -137,7 +137,7 @@ class MigrateController extends AbstractActionController
             /** @var $migrationVersionTable \YcheukfMigration\Model\MigrationVersionTable */
             $migrationVersionTable = $this->getServiceLocator()->get('YcheukfMigration\Model\MigrationVersionTable');
 
-            $this->migration = new Migration($adapter, $config['migrations'], $migrationVersionTable, $output);
+            $this->migration = new Migration($adapter, $config['migrations'], $migrationVersionTable, $output, $this->getServiceLocator());
         }
         return $this->migration;
     }

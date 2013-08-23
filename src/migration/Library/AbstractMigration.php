@@ -10,11 +10,13 @@ abstract class AbstractMigration implements MigrationInterface
     private $sql = array();
     private $metadata;
     private $writer;
+    public $serviceManager;
 
-    public function __construct(MetadataInterface $metadata, OutputWriter $writer)
+    public function __construct(MetadataInterface $metadata, OutputWriter $writer, $sm=null)
     {
         $this->metadata = $metadata;
         $this->writer = $writer;
+		$this->serviceManager = $sm;
     }
 
     /**
