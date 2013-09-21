@@ -157,9 +157,7 @@ class MigrateController extends AbstractActionController
 		}
 //		$sCommand = "php ".BASE_INDEX_PATH."/".$this->getRequest()->getScriptName()." ".join(" ", $aConsoleReq);
 		$sCommand = "php ".BASE_INDEX_PATH."/index.php ".join(" ", $aConsoleReq);
-//echo BASE_INDEX_PATH."\n";
-//echo $sCommand."\n";
-		\YcheukfDebug\Model\Debug::dump($sCommand, 'a', 'migration db key');
+		$this->_debug($sCommand, 'a', 'migration db key');
 		return ($sCommand);
 	}
 
@@ -168,6 +166,10 @@ class MigrateController extends AbstractActionController
 //			throw new MigrationException('missin param <dbkey>');
 	}
 
+	public function _debug($a, $b){
+		if(class_exists('\YcheukfDebug\Model\Debug'))
+			\YcheukfDebug\Model\Debug::dump($a, $b);
+	}
     /**
      * up migrations - applied all update
      *
@@ -203,11 +205,11 @@ class MigrateController extends AbstractActionController
         }
     }
     private function _echofaild($sMsg){
-		\YcheukfDebug\Model\Debug::dump($sMsg, 'migration faild');
+		$this->_debug($sMsg, 'migration faild');
 		return "====errors:====\n" . $sMsg . "\n\nFAILD!\n\n";
 	}
     private function _echomemo($aConfigTmp){
-		\YcheukfDebug\Model\Debug::dump(json_encode($aConfigTmp), 'migration memo');
+		$this->_debug(json_encode($aConfigTmp), 'migration memo');
 	}
 	
     /**
