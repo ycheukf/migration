@@ -110,7 +110,9 @@ TABLE;
         $migrations = $this->getMigrationClasses($force);
 
         if (!is_null($version) && !$this->hasMigrationVersions($migrations, $version)) {
-            throw new MigrationException(sprintf('Migration version %s is not found!', $version));
+			echo sprintf('Migration version %s is not found!', $version);
+			return true;
+//            throw new MigrationException(sprintf('Migration version %s is not found!', $version));
         }
 
         $currentMigrationVersion = $this->migrationVersionTable->getCurrentVersion();
@@ -269,10 +271,12 @@ TABLE;
         $this->outputWriter->writeLine(sprintf("Execute migration class %s %s", $migration['class'], $down ? 'down' : 'up'));
 
         $sqlList = $down ? $migrationObject->getDownSql() : $migrationObject->getUpSql();
-        foreach ($sqlList as $sql) {
-            $this->outputWriter->writeLine("Execute query:\n\n" . $sql);
-            $this->connection->execute($sql);
-        }
+		if(count($sqlList)){
+			foreach ($sqlList as $sql) {
+				$this->outputWriter->writeLine("Execute query:\n\n" . $sql);
+				$this->connection->execute($sql);
+			}
+		}
 
         if ($down) {
             $this->migrationVersionTable->delete($migration['version']);
