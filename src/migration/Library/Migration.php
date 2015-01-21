@@ -17,6 +17,7 @@ class Migration
     const MIGRATION_TABLE = 'migration_version';
 
     protected $migrationsDir;
+    protected $migrationsDirMd5;
     protected $migrationsNamespace;
     protected $adapter;
     /**
@@ -41,6 +42,7 @@ class Migration
         $this->metadata = new Metadata($this->adapter);
         $this->connection = $this->adapter->getDriver()->getConnection();
         $this->migrationsDir = $config['dir'];
+        $this->migrationsDirMd5 = md5($config['dir']);
         $this->migrationsNamespace = $config['namespace'];
         $this->migrationVersionTable = $migrationVersionTable;
         $this->outputWriter = is_null($writer) ? new OutputWriter() : $writer;
@@ -74,15 +76,20 @@ class Migration
             $sql = <<<TABLE
 CREATE TABLE IF NOT EXISTS `%s` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `mdir` text NOT NULL ,
+  `mdir_md5` varchar(64) NOT NULL ,
   `version` bigint(20) unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `version` (`version`)
+  KEY `version` (`version`),
+  KEY `mdir_md5` (`mdir_md5`)
 );
 TABLE;
         } else {
             $sql = <<<TABLE
 CREATE TABLE IF NOT EXISTS "%s" (
   "id"  SERIAL NOT NULL,
+  `mdir` text NOT NULL ,
+  `mdir_md5` varchar(64) NOT NULL ,
   "version" bigint NOT NULL,
   PRIMARY KEY ("id")
 );
@@ -96,7 +103,7 @@ TABLE;
      */
     public function getCurrentVersion()
     {
-        return $this->migrationVersionTable->getCurrentVersion();
+        return $this->migrationVersionTable->getCurrentVersion($this->migrationsDirMd5);
     }
 
     /**
@@ -115,7 +122,7 @@ TABLE;
 //            throw new MigrationException(sprintf('Migration version %s is not found!', $version));
         }
 
-        $currentMigrationVersion = $this->migrationVersionTable->getCurrentVersion();
+        $currentMigrationVersion = $this->migrationVersionTable->getCurrentVersion($this->migrationsDirMd5);
         if (!is_null($version) && $version == $currentMigrationVersion && !$force) {
             throw new MigrationException(sprintf('Migration version %s is current version!', $version));
         }
@@ -127,7 +134,7 @@ TABLE;
                     if ($migration['version'] == $version) {
                         // if existing migration is forced to apply - delete its information from migrated
                         // to avoid duplicate key error
-                        if (!$down) $this->migrationVersionTable->delete($migration['version']);
+                        if (!$down) $this->migrationVersionTable->delete($migration['version'], $this->migrationsDirMd5);
                         $this->applyMigration($migration, $down);
                         break;
                     }
@@ -222,36 +229,54 @@ TABLE;
     public function getMigrationClasses($all = false)
     {
         $classes = new \ArrayIterator();
+        $sModuleDir = __DIR__."/../../../../../../module";
+//        var_dump(file_exists($sModuleDir));
+        $aMigrationDir = array();
+//        if(file_exists($sModuleDir)){
+//            foreach (new \DirectoryIterator($sModuleDir) as $fileInfo) {
+//                if($fileInfo->isDot()) continue;
+//                if(!$fileInfo->isDir()) continue;
+//                $sDirTmp = $sModuleDir."/".$fileInfo->getFilename()."/migrations";
+//                if(file_exists($sDirTmp)){
+//                    $aMigrationDir[] = $sDirTmp;
+//                }
+//            }
+//        
+//        }
+        $aMigrationDir[] = $this->migrationsDir;
+//        var_dump($aMigrationDir);
+        foreach($aMigrationDir as $sDirTmp){
+            $iterator = new \GlobIterator(sprintf('%s/Version*.php', $sDirTmp), \FilesystemIterator::KEY_AS_FILENAME);
+            foreach ($iterator as $item) {
+                /** @var $item \SplFileInfo */
+                if (preg_match('/(Version(\d+))\.php/', $item->getFilename(), $matches)) {
+                    $applied = $this->migrationVersionTable->applied($matches[2], $this->migrationsDirMd5);
+                    if ($all || !$applied) {
+                        $className = $this->migrationsNamespace . '\\' . $matches[1];
 
-        $iterator = new \GlobIterator(sprintf('%s/Version*.php', $this->migrationsDir), \FilesystemIterator::KEY_AS_FILENAME);
-        foreach ($iterator as $item) {
-            /** @var $item \SplFileInfo */
-            if (preg_match('/(Version(\d+))\.php/', $item->getFilename(), $matches)) {
-                $applied = $this->migrationVersionTable->applied($matches[2]);
-                if ($all || !$applied) {
-                    $className = $this->migrationsNamespace . '\\' . $matches[1];
+                        if (!class_exists($className))
+                            /** @noinspection PhpIncludeInspection */
+                            require_once $sDirTmp . '/' . $item->getFilename();
 
-                    if (!class_exists($className))
-                        /** @noinspection PhpIncludeInspection */
-                        require_once $this->migrationsDir . '/' . $item->getFilename();
+                        if (class_exists($className)) {
+                            $reflectionClass = new \ReflectionClass($className);
+                            $reflectionDescription = new \ReflectionProperty($className, 'description');
 
-                    if (class_exists($className)) {
-                        $reflectionClass = new \ReflectionClass($className);
-                        $reflectionDescription = new \ReflectionProperty($className, 'description');
-
-                        if ($reflectionClass->implementsInterface('YcheukfMigration\Library\MigrationInterface')) {
-                            $classes->append(array(
-                                'version' => $matches[2],
-                                'class' => $className,
-                                'description' => $reflectionDescription->getValue(),
-                                'applied' => $applied,
-                            ));
+                            if ($reflectionClass->implementsInterface('YcheukfMigration\Library\MigrationInterface')) {
+                                $classes->append(array(
+                                    'version' => $matches[2],
+                                    'class' => $className,
+                                    'description' => $reflectionDescription->getValue(),
+                                    'applied' => $applied,
+                                ));
+                            }
                         }
                     }
                 }
             }
         }
-
+//var_dump($classes);
+//exit;
         $classes->uasort(function ($a, $b) {
             if ($a['version'] == $b['version']) {
                 return 0;
@@ -259,7 +284,6 @@ TABLE;
 
             return ($a['version'] < $b['version']) ? -1 : 1;
         });
-
         return $classes;
     }
 
@@ -268,7 +292,7 @@ TABLE;
         /** @var $migrationObject AbstractMigration */
         $migrationObject = new $migration['class']($this->metadata, $this->outputWriter, $this->serviceManager);
 
-        $this->outputWriter->writeLine(sprintf("Execute migration class %s %s", $migration['class'], $down ? 'down' : 'up'));
+        $this->outputWriter->writeLine(sprintf("Execute migration class %s %s at %s", $migration['class'], $down ? 'down' : 'up', $this->migrationsDir));
 
         $sqlList = $down ? $migrationObject->getDownSql() : $migrationObject->getUpSql();
 		if(count($sqlList)){
@@ -279,9 +303,9 @@ TABLE;
 		}
 
         if ($down) {
-            $this->migrationVersionTable->delete($migration['version']);
+            $this->migrationVersionTable->delete($migration['version'], $this->migrationsDirMd5);
         } else {
-            $this->migrationVersionTable->save($migration['version']);
+            $this->migrationVersionTable->save($migration['version'], $this->migrationsDir);
         }
     }
 }

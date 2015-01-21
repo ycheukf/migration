@@ -87,12 +87,11 @@ class MigrateController extends AbstractActionController
         $currentMigrationVersion = $this->getMigration()->getCurrentVersion();
         $force = $this->getRequest()->getParam('force');
 
-
         if (is_null($version) && $force) {
             return "Can't force migration apply without migration version explicitly set.";
         }
         if (!$force && is_null($version) && $currentMigrationVersion >= $this->getMigration()->getMaxMigrationVersion($migrations)) {
-            return "No migrations to apply.\n";
+            return "";
         }
 
         try {
@@ -192,7 +191,7 @@ class MigrateController extends AbstractActionController
 						}
 					}
 				}
-				return "\nDONE\n\n";
+//				return "\nDONE\n\n";
 			}else{//mult migration
 				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
 					$sTmp = $this->_getMigrationCommandByDbKey($sKey);
@@ -246,7 +245,7 @@ class MigrateController extends AbstractActionController
 						}
 					}
 				}
-				return "\nDONE\n\n";
+//				return "\nDONE\n\n";
 			}else{//mult migration
 				foreach($this->aDbsConfig as $sKey => $aConfigTmp){
 					$sTmp = $this->_getMigrationCommandByDbKey($sKey);
